@@ -355,7 +355,9 @@ def generate_slides_from_qa_pairs(client, qa_pairs: List[dict], document_summary
     qa_content = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
     
     prompt = f"""
-    Create an engaging and practical presentation from this Q&A content. Focus on making slides that are easy to present and understand.
+    As an expert presentation designer, create a visually stunning and highly professional slide deck from the following Q&A content. The slides should be clean, modern, and follow best practices for visual storytelling.
+
+    **Core Objective:** Transform dense Q&A material into a compelling narrative that is easy to digest and visually engaging.
 
     **Document Context:**
     Title: {document_summary.title}
@@ -365,26 +367,31 @@ def generate_slides_from_qa_pairs(client, qa_pairs: List[dict], document_summary
     **Source Q&A Content:**
     {qa_content}
 
-    **Instructions for Visual-First Slides (60% Image, 40% Text):**
-    Create 4-6 slides optimized for visual learners. For each slide, provide:
+    **Design Principles for High-Quality Slides:**
+    1.  **Modern & Clean Aesthetic:** Think minimalist design. Use ample white space. Avoid clutter.
+    2.  **Visual Storytelling:** Each slide should build on the last, telling a cohesive story. The visual element is the hero.
+    3.  **Clarity & Simplicity:** "Less is more." Use concise text and powerful visuals.
+    4.  **Professional Branding:** The tone should be authoritative yet accessible.
 
-    1. **Title**: Clear, descriptive slide title (keep under 8 words)
-    2. **Content**: CONCISE key points for the slide - only 2-3 bullet points maximum, each under 15 words, starting with "•"
-    3. **Image Description**: DETAILED visual description for strong visual impact (this will occupy 60% of slide space):
-       - For technical content: "System architecture diagram showing [specific components and connections]"
-       - For processes: "Flowchart diagram illustrating [step-by-step process with decision points]"
-       - For concepts: "Conceptual diagram visualizing [relationships between key elements]"
-       - For data: "Data visualization chart showing [specific metrics and patterns]"
-    4. **Speaker Notes**: Natural, conversational explanation (3-4 sentences) that expands on the concise bullet points
+    **Instructions for a 70% Visual, 30% Text Layout:**
+    Generate 5-7 high-impact slides. For each slide, provide:
 
-    **CRITICAL - Optimize for Visual Learning:**
-    - Text content should be MINIMAL and IMPACTFUL (40% of space)
-    - Image descriptions should be DETAILED and SPECIFIC (60% of space)
-    - Each bullet point should be a key takeaway, not detailed explanation
-    - Visual descriptions should suggest strong, memorable diagrams/charts
-    - Speaker notes provide the detailed context during narration
+    1.  **Title:** A short, compelling title (max 7 words) that grabs attention.
+    2.  **Content:** 2-3 ultra-concise bullet points (max 12 words each). Each point must be a powerful takeaway. Start with "•".
+    3.  **Image Description:** A detailed, vivid description for a high-quality, modern visual. This is the centerpiece of the slide (70% of the space).
+        *   **For technical concepts:** "A clean, isometric 3D illustration of a neural network with clearly labeled layers..."
+        *   **For processes:** "A sleek, minimalist flowchart with modern icons and a clear, directional flow..."
+        *   **For data:** "A beautiful, easy-to-read data visualization (e.g., a bar chart or heatmap) with a clear legend and highlighted insights..."
+        *   **For concepts:** "An abstract, conceptual artwork that metaphorically represents the idea of..."
+    4.  **Speaker Notes:** Engaging, conversational notes (3-4 sentences) that tell the story behind the slide. Should sound natural and confident.
 
-    Focus on creating slides where the visual tells the story and text provides key anchors.
+    **CRITICAL DESIGN MANDATES:**
+    -   **Minimalism:** Text is for support, not the main focus.
+    -   **Visuals First:** The image description must be detailed enough to generate a stunning, relevant visual.
+    -   **Narrative Flow:** Ensure the slides progress logically from introduction to conclusion.
+    -   **Professional Tone:** Speaker notes should be crafted for a knowledgeable audience.
+
+    Create slides that are not just informative, but also memorable and aesthetically pleasing.
     """
 
     slides_schema = {
@@ -416,7 +423,7 @@ def generate_slides_from_qa_pairs(client, qa_pairs: List[dict], document_summary
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are an expert educator who creates clear, engaging slides from Q&A content. Generate valid JSON with proper escaping. IMPORTANT: Make sure 'content' is always a single string with bullet points separated by \\n newlines. Each bullet point should start with '•' followed by a space."},
+                {"role": "system", "content": "You are a world-class presentation designer and visual storyteller. Your task is to convert dense Q&A content into a beautiful, modern, and professional slide deck. Generate valid JSON with proper escaping. Ensure that the 'content' field is a single string with bullet points separated by \n, each starting with '• '."},
                 {"role": "user", "content": prompt}
             ],
             tools=[{"type": "function", "function": slides_schema}],
@@ -476,32 +483,30 @@ def create_fallback_slides(document_summary: DocumentSummary) -> List[SlideConte
     ]
 
 def extract_pdf_figures(file_contents: bytes) -> List[dict]:
-    """Extract figures and images from PDF"""
+    """Extracts and analyzes figures from a PDF, skipping small or irrelevant images."""
     figures = []
     
     try:
-        # Use PyMuPDF to extract images
         pdf_document = fitz.open(stream=file_contents, filetype="pdf")
         
         for page_num in range(len(pdf_document)):
             page = pdf_document[page_num]
-            
-            # Get images on this page
             image_list = page.get_images(full=True)
             
             for img_index, img in enumerate(image_list):
+                xref = img[0]
+                
                 try:
-                    # Get image data
-                    xref = img[0]
                     pix = fitz.Pixmap(pdf_document, xref)
                     
-                    # Skip images that are too small (likely not figures)
-                    if pix.width < 100 or pix.height < 100:
+                    # Skip small images that are likely decorative or not figures
+                    if pix.width < 150 or pix.height < 150:
+                        print(f"- Skipping small image on page {page_num + 1} (size: {pix.width}x{pix.height})")
                         pix = None
                         continue
                     
-                    # Convert to base64
-                    if pix.n - pix.alpha < 4:  # GRAY or RGB
+                    # Convert to PNG for consistent format
+                    if pix.n - pix.alpha < 4:  # Handles GRAY, RGB
                         img_data = pix.tobytes("png")
                         img_base64 = base64.b64encode(img_data).decode()
                         
@@ -513,16 +518,32 @@ def extract_pdf_figures(file_contents: bytes) -> List[dict]:
                             "data": img_base64,
                             "type": "extracted_figure"
                         })
-                    
+                    else:  # Handles CMYK
+                        cmyk_pix = fitz.Pixmap(fitz.csRGB, pix)
+                        img_data = cmyk_pix.tobytes("png")
+                        img_base64 = base64.b64encode(img_data).decode()
+                        
+                        figures.append({
+                            "page": page_num + 1,
+                            "index": img_index,
+                            "width": cmyk_pix.width,
+                            "height": cmyk_pix.height,
+                            "data": img_base64,
+                            "type": "extracted_figure"
+                        })
+                        cmyk_pix = None
+
                     pix = None
-                except:
+                
+                except Exception as e:
+                    print(f"⚠️ Error processing image on page {page_num + 1}, index {img_index}: {e}")
                     continue
         
         pdf_document.close()
-        print(f"📊 Extracted {len(figures)} figures from PDF")
+        print(f"📊 Successfully extracted and processed {len(figures)} figures from the PDF.")
         
     except Exception as e:
-        print(f"⚠️ Figure extraction failed: {e}")
+        print(f"❌ Critical error during PDF figure extraction: {e}")
     
     return figures
 
@@ -580,50 +601,46 @@ def generate_slides_with_visuals(sections, summary, extracted_figures=None):
         extracted_figures = []
     
     prompt = f"""
-    Based on this document analysis, create engaging presentation slides that incorporate visual elements:
+    As a senior presentation designer, create a visually driven and professional slide deck based on the provided document analysis. The slides must be clean, modern, and designed for maximum impact and clarity.
 
-    DOCUMENT SUMMARY:
+    **Core Objective:** Translate document sections and summaries into a compelling visual narrative.
+
+    **DOCUMENT SUMMARY:**
     Title: {summary.get('title', 'Research Document')}
     Abstract: {summary.get('abstract', 'No abstract available')}
     Key Topics: {', '.join(summary.get('main_topics', []))}
 
-    AVAILABLE FIGURES: {len(extracted_figures)} extracted from PDF
+    **AVAILABLE FIGURES:** {len(extracted_figures)} extracted from PDF
 
-    CONTENT SECTIONS:
+    **CONTENT SECTIONS:**
     {chr(10).join([f"- {section.get('title', 'Section')}: {section.get('content', '')[:200]}..." for section in sections[:8]])}
 
-    CREATE 4-6 ENGAGING SLIDES with the following structure for each slide:
+    **Instructions for High-Impact Visual Slides:**
+    Generate 5-7 slides, each with a strong visual focus. For each slide, provide:
 
-    For each slide, provide:
-    1. TITLE: Clear, engaging title
-    2. CONTENT: 2-3 key points, each on a separate line starting with "•" (max 150 words total)
-    3. VISUAL_TYPE: Choose from:
-       - "pdf_figure" (if relevant figure exists from PDF)
-       - "visual_emphasis" (for technical concepts that need visualization)
-       - "text_emphasis" (for concept-heavy slides)
-    4. VISUAL_DESCRIPTION: Detailed description for diagram creation or figure caption
-    5. SPEAKER_NOTES: What the presenter should say (conversational, 2-3 sentences)
+    1.  **TITLE:** A concise, powerful title (max 7 words).
+    2.  **CONTENT:** 2-3 minimalist bullet points (max 12 words each), starting with "•". These should be key takeaways.
+    3.  **VISUAL_TYPE:** Choose from:
+        *   `pdf_figure`: Use a relevant figure from the document.
+        *   `visual_emphasis`: For technical or conceptual content that needs a strong visual.
+        *   `text_emphasis`: For slides where the text is the primary focus.
+    4.  **VISUAL_DESCRIPTION:** A detailed description for creating a high-quality visual or for captioning a PDF figure.
+        *   **For `visual_emphasis`:** "A sleek 3D isometric illustration of a data pipeline..." or "A modern, abstract design representing the concept of..."
+        *   **For `pdf_figure`:** A concise and informative caption for the figure.
+    5.  **SPEAKER_NOTES:** Polished, conversational notes (3-4 sentences) that provide context and narrative.
 
-    IMPORTANT FORMATTING:
-    - Each bullet point must be on its own line
-    - Use "•" followed by space for each point
-    - No overlapping text or run-on lines
+    **CRITICAL DESIGN GUIDELINES:**
+    -   **Follow a Narrative Arc:** Start with an introduction, build on key findings, and end with a strong conclusion.
+    -   **Prioritize Visuals:** The visual element should dominate each slide.
+    -   **Embrace Minimalism:** Use ample white space and avoid clutter.
+    -   **Ensure Readability:** Text should be large, clear, and concise.
 
-    GUIDELINES:
-    - Start with overview slide
-    - Focus on key insights and findings
-    - Make technical content accessible
-    - End with implications/conclusions
-    - Suggest visual diagrams for: system architectures, algorithms, data flows, comparisons
-    - Reference PDF figures for: experimental results, charts, existing diagrams
-
-    Format each slide as:
+    Format each slide precisely as follows:
     SLIDE_X:
     TITLE: [title]
-    CONTENT: 
+    CONTENT:
     • [First key point]
     • [Second key point]
-    • [Third key point]
     VISUAL_TYPE: [pdf_figure/visual_emphasis/text_emphasis]
     VISUAL_DESCRIPTION: [detailed description]
     SPEAKER_NOTES: [conversational notes]
@@ -633,7 +650,7 @@ def generate_slides_with_visuals(sections, summary, extracted_figures=None):
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert presentation designer creating educational slides with visual elements."},
+                {"role": "system", "content": "You are a senior presentation designer with expertise in creating visually-driven, professional, and modern slide decks. Your task is to generate a slide deck from the provided document analysis, ensuring each slide is a perfect blend of clarity, and aesthetic appeal."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3000,
@@ -734,53 +751,59 @@ def parse_enhanced_slides(content: str, extracted_figures: List[dict]) -> List[d
     return slides
 
 def check_figure_relevance(slide_content: str, slide_title: str, pdf_figure_info: dict, pdf_text: str = "") -> float:
-    """Check how relevant a PDF figure is to slide content (0.0 to 1.0)"""
+    """Calculates a relevance score between slide content and a PDF figure (0.0 to 1.0)."""
     
-    # Extract page context around the figure
-    page_num = pdf_figure_info.get("page", 1)
-    figure_context = f"Figure from page {page_num}"
+    slide_text = (slide_content + " " + slide_title).lower()
+    slide_words = set(re.findall(r'\b\w+\b', slide_text))
     
-    # Simple relevance scoring based on content overlap
-    content_words = set(slide_content.lower().split() + slide_title.lower().split())
-    
-    # Keywords that suggest figures are relevant
+    # Keywords that strongly indicate a figure's relevance
     technical_keywords = {
         "architecture", "diagram", "system", "model", "framework",
         "algorithm", "process", "flow", "network", "structure",
-        "data", "result", "analysis", "comparison", "chart"
+        "data", "result", "analysis", "comparison", "chart", "figure", "graph"
     }
     
-    # Check if slide content mentions technical concepts
-    has_technical_content = any(keyword in slide_content.lower() for keyword in technical_keywords)
+    # Score based on keyword matches
+    keyword_score = sum(1 for word in technical_keywords if word in slide_words) / len(technical_keywords)
     
-    # Higher relevance for technical slides
-    base_relevance = 0.7 if has_technical_content else 0.3
-    
-    # Adjust based on figure size (larger figures likely more important)
+    # Score based on the figure's size (larger figures are generally more important)
     width = pdf_figure_info.get("width", 0)
     height = pdf_figure_info.get("height", 0)
-    if width > 400 and height > 300:
-        base_relevance += 0.2
+    size_score = min((width * height) / (800 * 600), 1.0) # Normalize against a large figure size
     
-    return min(base_relevance, 1.0)
+    # Contextual score from the page number
+    page_num = pdf_figure_info.get("page", 1)
+    context_score = 1.0 / (1 + abs(page_num - len(pdf_text) // 4000)) # Assume ~4000 chars/page
+    
+    # Combine scores with weighting
+    # Weighted average: 50% keyword, 30% size, 20% context
+    relevance = (0.5 * keyword_score) + (0.3 * size_score) + (0.2 * context_score)
+    
+    # Boost score if the slide explicitly mentions a figure
+    if "figure" in slide_words or "diagram" in slide_words:
+        relevance *= 1.2
+        
+    print(f"  - Figure on page {page_num}: Keyword Score={keyword_score:.2f}, Size Score={size_score:.2f}, Context Score={context_score:.2f} -> Relevance={min(relevance, 1.0):.2f}")
+
+    return min(relevance, 1.0)
 
 def assign_visuals_to_slides(slides: List[SlideContent], extracted_figures: List[dict], document_text: str = "") -> List[SlideContent]:
-    """Assign PDF figures to relevant slides, use text emphasis for others"""
+    """Assigns the most relevant PDF figures to slides based on a sophisticated relevance score."""
     
-    print(f"🎨 Assigning visuals to {len(slides)} slides...")
+    print(f"🎨 Assigning visuals to {len(slides)} slides using enhanced relevance scoring...")
     
-    # Track which figures have been used
     used_figures = set()
     
     for slide in slides:
-        best_figure = None
-        best_relevance = 0.0
+        best_figure_index = None
+        highest_relevance = 0.0
         
-        # Check each PDF figure for relevance
+        print(f"\nAssessing figures for Slide {slide.slide_number}: '{slide.title}'")
+        
         for i, figure in enumerate(extracted_figures):
             if i in used_figures:
                 continue
-                
+            
             relevance = check_figure_relevance(
                 slide.content, 
                 slide.title, 
@@ -788,22 +811,21 @@ def assign_visuals_to_slides(slides: List[SlideContent], extracted_figures: List
                 document_text
             )
             
-            if relevance > best_relevance and relevance > 0.5:  # Minimum relevance threshold
-                best_figure = i
-                best_relevance = relevance
+            if relevance > highest_relevance:
+                highest_relevance = relevance
+                best_figure_index = i
         
-        # Assign PDF figure if relevant enough
-        if best_figure is not None:
-            slide.pdf_figure_index = best_figure
+        # Assign the figure if it meets a minimum relevance threshold
+        if best_figure_index is not None and highest_relevance > 0.4: # Increased threshold for higher quality matching
+            slide.pdf_figure_index = best_figure_index
             slide.visual_type = "pdf_figure"
-            used_figures.add(best_figure)
-            print(f"✅ Slide {slide.slide_number}: Assigned PDF figure {best_figure} (relevance: {best_relevance:.2f})")
+            used_figures.add(best_figure_index)
+            print(f"✅ Assigned PDF Figure {best_figure_index} to Slide {slide.slide_number} (Relevance: {highest_relevance:.2f})")
         else:
-            # Use text emphasis for slides without relevant PDF figures
             slide.visual_type = "text_emphasis"
             slide.pdf_figure_index = None
-            print(f"📝 Slide {slide.slide_number}: Using text emphasis (no relevant PDF figure)")
-    
+            print(f"📝 No highly relevant PDF figure found for Slide {slide.slide_number}. Using text emphasis.")
+            
     return slides
 
 # Chart generation functions removed - using PDF figures only for better performance
