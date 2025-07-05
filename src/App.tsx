@@ -191,6 +191,8 @@ function App() {
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(true);
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   // Check backend connection on mount
   useEffect(() => {
@@ -242,6 +244,51 @@ function App() {
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleUrlUpload = async () => {
+    if (!pdfUrl.trim()) {
+      alert('Please enter a PDF URL');
+      return;
+    }
+
+    if (!isBackendConnected) {
+      alert('Backend not connected. Running in demo mode.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Send URL to backend for processing
+      const response = await fetch(`${BackendService['baseUrl']}/api/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pdfUrl })
+      });
+
+      if (!response.ok) {
+        throw new Error(`URL upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        const summary = await BackendService.getDocumentSummary();
+        setDocumentSummary(summary);
+        setIsDemoMode(false);
+        setPdfUrl('');
+        setShowUrlInput(false);
+        alert(`PDF from URL processed successfully! ${result.message}`);
+      }
+    } catch (error) {
+      console.error('URL upload failed:', error);
+      alert('URL upload failed. Please check the URL and try again.');
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -377,23 +424,34 @@ function App() {
               </div>
 
               {/* Upload Button */}
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
+              <div className="flex items-center space-x-2">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                  <div className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    <span>{isUploading ? 'Processing...' : 'Upload PDF'}</span>
+                  </div>
+                </label>
+
+                <button
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                   disabled={isUploading}
-                />
-                <div className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                  {isUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  <span>{isUploading ? 'Uploading...' : 'Upload PDF'}</span>
-                </div>
-              </label>
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>PDF URL</span>
+                </button>
+              </div>
 
               {/* Settings */}
               <button
@@ -406,6 +464,65 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* PDF URL Input Modal */}
+      {showUrlInput && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-green-600" />
+              Enter PDF URL
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PDF URL
+                </label>
+                <input
+                  type="url"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="https://example.com/document.pdf"
+                  disabled={isUploading}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter a direct link to a PDF file
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowUrlInput(false);
+                    setPdfUrl('');
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                  disabled={isUploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUrlUpload}
+                  disabled={isUploading || !pdfUrl.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      <span>Process PDF</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
