@@ -1,0 +1,15 @@
+# Environment Variables for Study Buddy Backend
+# Set these in your deployment platform's environment configuration
+
+# REQUIRED: OpenAI API Key for slide generation and document processing
+OPENAI_API_KEY=your_openai_api_key_here
+
+# REQUIRED: ElevenLabs Voice System (TTS, STT, Conversation)
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+
+# Frontend Configuration
+FRONTEND_URL=https://study-buddy-for-me-and-you.site
+CORS_ORIGINS=https://study-buddy-for-me-and-you.site,http://localhost:5173
+
+# Optional: Port override (default: 8000)
+PORT=8000

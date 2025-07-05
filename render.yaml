@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: are-you-taking-notes-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: ./backend
+    buildCommand: pip install -r requirements-minimal.txt
+    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
