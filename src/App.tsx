@@ -190,7 +190,6 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(true);
   const [pdfUrl, setPdfUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
@@ -199,9 +198,6 @@ function App() {
     const checkBackend = async () => {
       const connected = await BackendService.checkConnection();
       setIsBackendConnected(connected);
-      if (!connected) {
-        setIsDemoMode(true);
-      }
     };
     checkBackend();
   }, []);
@@ -225,7 +221,7 @@ function App() {
     }
 
     if (!isBackendConnected) {
-      alert('Backend not connected. Running in demo mode.');
+      alert('Backend not connected. Please ensure the backend server is running.');
       return;
     }
 
@@ -257,7 +253,7 @@ function App() {
     }
 
     if (!isBackendConnected) {
-      alert('Backend not connected. Running in demo mode.');
+      alert('Backend not connected. Please ensure the backend server is running.');
       return;
     }
 
@@ -297,7 +293,7 @@ function App() {
 
   const handleGenerateSlides = async () => {
     if (!isBackendConnected) {
-      alert('Backend not connected. Using demo slides.');
+      alert('Backend not connected. Please ensure the backend server is running.');
       return;
     }
 
@@ -324,9 +320,7 @@ function App() {
     }
 
     if (!isBackendConnected) {
-      // Demo mode - simulate audio playback
-      setIsPlaying(true);
-      setTimeout(() => setIsPlaying(false), 3000);
+      alert('Audio playback requires backend connection. Please ensure the backend server is running.');
       return;
     }
 
@@ -352,7 +346,7 @@ function App() {
 
   const handleVoiceRecording = async () => {
     if (!isBackendConnected) {
-      alert('Voice features require backend connection.');
+      alert('Voice features require backend connection. Please ensure the backend server is running.');
       return;
     }
 
@@ -713,17 +707,9 @@ function App() {
               </div>
             </div>
 
-            {/* Demo Mode Notice */}
-            {isDemoMode && (
-              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
-                  <p className="text-yellow-800">
-                    <strong>Demo Mode:</strong> Upload a PDF and connect to the backend for full AI features including slide generation and voice interactions.
-                  </p>
-                </div>
-              </div>
-            )}
+            </div>
+        </div>
+      </div>
           </div>
         </div>
       </div>
